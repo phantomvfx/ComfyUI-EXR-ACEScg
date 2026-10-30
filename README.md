@@ -14,9 +14,11 @@ Loads EXR images or image sequences into ComfyUI as standard image tensors.
 - **color_space**: 
   - `Raw (Keep ACEScg)`: Loads the EXR data without applying any color transformations.
   - `Convert ACEScg to Linear sRGB`: Applies a matrix transformation to convert ACEScg (AP1) color space to Linear sRGB, matching typical ComfyUI image workflows.
+  - `Auto (from EXR header)`: reads the file's `chromaticities` attribute. ACEScg (AP1) and ACES2065-1 (AP0) are converted to linear sRGB, Rec.709 is kept as is, and a file without the attribute is treated as ACEScg. Other primaries raise an error (use `Raw` and an OCIO node).
 - **load_mode**: Choose between `single_frame` and `image_sequence`.
 - **frame_index**: The starting frame index to load (especially useful for sequences or padded single files).
 - **sequence_limit**: Limits the maximum number of frames to load when working with sequences (0 means load all available following `frame_index`).
+- **missing_frames** (optional): `skip` (default) loads only the frames on disk. `hold previous` fills gaps with the last frame found (as OpenRV and Nuke do), so batch index = frame number - first frame and saved results line up with the plate's frame numbers.
 
 **Outputs:**
 - **image**: RGB, 32-bit float, scene-linear (no clipping). Channels are picked by name (`R,G,B`, else `Y`), so multi-layer EXRs load their main layer.
@@ -36,6 +38,10 @@ Saves ComfyUI image tensors to 32-bit float EXR files.
 - **alpha** (optional `MASK`): straight alpha; when connected the file is written as RGBA.
 - **precision** (optional): `32-bit float` (default) or `16-bit half`.
 - **compression** (optional): `zip` (default), `zips`, `piz`, `dwaa`, `dwab`, `pxr24`, `b44`, `rle` or `none`.
+- **source_path** (optional): write *like the source*. Give the plate the image came from (a file, or a `name.####.exr` pattern with **source_frame** = the plate frame of the first batch image). The result is written into a copy of that EXR: its other layers and parts, header attributes, pixel formats, compression and data window are kept (the data window grows only to hold new pixels outside it). `precision` and `compression` are then ignored. Deep EXRs are not supported.
+- **changed** (optional `MASK`, with `source_path`): where pixels may differ from the source. Elsewhere the source pixels are written back unchanged, so untouched areas stay **bit-identical** to the plate. Feed it the mask of the edit (e.g. the mask output of Fit to Plate).
+
+With `Convert Linear sRGB to ACEScg`, a newly written file is tagged with ACEScg `chromaticities`, so `Auto` loads it correctly.
 
 Files are named `<prefix>_00001.exr`, `<prefix>_00002.exr`, ... and never overwrite earlier saves, so the output reads directly as a `<prefix>_#####.exr` sequence in Nuke or Resolve.
 
@@ -65,3 +71,7 @@ COMFYUI_ROOT=/path/to/ComfyUI /path/to/ComfyUI/venv/bin/python -m unittest disco
 ## Why ACEScg?
 
 Standard ComfyUI uses sRGB/Linear workflows. When integrating AI-generated imagery into VFX pipelines (e.g., Nuke, Resolve, Maya), maintaining accurate scene-linear data using ACEScg is critical. This node allows you to easily ingest 32-bit EXRs rendered in ACEScg, process them in ComfyUI using standard linear sRGB, and then accurately convert them back to ACEScg EXRs to maintain your color pipeline perfectly intact.
+
+## Credits
+
+Save EXR's write-like-source mode, the sequence gap handling and the chromaticities check follow the design of [AInVFX Paint a plate](https://github.com/AInVFX/ainvfx-paintaplate) (Apache-2.0), reimplemented here with OpenImageIO.
