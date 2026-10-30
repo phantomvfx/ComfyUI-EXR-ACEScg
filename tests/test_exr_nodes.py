@@ -303,7 +303,16 @@ class ExrNodeTests(unittest.TestCase):
             self.assertEqual(depth_spec.get_string_attribute("name"), "depth")
             self.assertTrue(np.allclose(depth, frame / 10))
         with self.assertRaises(FileNotFoundError):
-            self.save.save_exr(image, "mp_missing", source_path="mp.####.exr", source_frame=2001)
+            self.save.save_exr(image, "mp_missing", source_path="mp.####.exr", source_frame=1000)
+
+    def test_save_like_source_over_a_held_sequence_gap(self):
+        for frame in (1001, 1002, 1004):
+            self.write_exr(f"hole.{frame}.exr", np.full((2, 2, 3), frame, np.float32),
+                           attrs={"frame_tag": f"f{frame}"})
+        image, _ = self.load.load_exr("hole.####.exr", "Raw (Keep ACEScg)", "image_sequence", 1001, 0, "hold previous")
+        result = self.save.save_exr(image, "hole_out", source_path="hole.####.exr", source_frame=1001)
+        tags = [self.read_part(self.saved_path(result, i))[0].get_string_attribute("frame_tag") for i in range(4)]
+        self.assertEqual(tags, ["f1001", "f1002", "f1002", "f1004"])  # the gap 1003 is written like 1002
 
     def test_is_changed_tracks_file_modification(self):
         path = self.write_exr("live.exr", np.zeros((2, 2, 3)))

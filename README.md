@@ -18,7 +18,7 @@ Loads EXR images or image sequences into ComfyUI as standard image tensors.
 - **load_mode**: Choose between `single_frame` and `image_sequence`.
 - **frame_index**: The starting frame index to load (especially useful for sequences or padded single files).
 - **sequence_limit**: Limits the maximum number of frames to load when working with sequences (0 means load all available following `frame_index`).
-- **missing_frames** (optional): `skip` (default) loads only the frames on disk. `hold previous` fills gaps with the last frame found (as OpenRV and Nuke do), so batch index = frame number - first frame and saved results line up with the plate's frame numbers.
+- **missing_frames** (optional): `skip` (default) loads only the frames on disk. `hold previous` fills gaps with the last frame found (as OpenRV and Nuke do), so batch index = frame number - first frame. Use this with Save EXR's `source_path` on a sequence with gaps: Save maps batch index i to source frame `source_frame + i` and writes a missing frame like the nearest earlier one. Output files are still numbered by the save counter (`<prefix>_00001.exr`, ...), in batch order.
 
 **Outputs:**
 - **image**: RGB, 32-bit float, scene-linear (no clipping). Channels are picked by name (`R,G,B`, else `Y`), so multi-layer EXRs load their main layer.

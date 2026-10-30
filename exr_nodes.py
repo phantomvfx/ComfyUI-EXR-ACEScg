@@ -458,12 +458,18 @@ class SaveEXRNode:
     def _source_file(self, source_path, frame):
         loader = LoadEXRNode()
         path = source_path.strip().strip('"').strip("'")
-        if re.search(r'#+|%\d*d', path):
-            path = loader._resolve_path(path, frame)
-        path = loader._resolve_input_path(path)
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Source EXR not found: {path}")
-        return path
+        if not re.search(r'#+|%\d*d', path):
+            resolved = loader._resolve_input_path(path)
+            if not os.path.exists(resolved):
+                raise FileNotFoundError(f"Source EXR not found: {resolved}")
+            return resolved
+        # A frame missing from the sequence takes the nearest earlier one, as Load EXR's
+        # "hold previous" does, so a held batch maps back onto the plate frame by frame
+        for f in range(frame, max(frame - 1000, -1), -1):
+            resolved = loader._resolve_input_path(loader._resolve_path(path, f))
+            if os.path.exists(resolved):
+                return resolved
+        raise FileNotFoundError(f"Source EXR not found: {loader._resolve_path(path, frame)} (or any earlier frame)")
 
     def save_exr(self, images, filename_prefix="ComfyUI_EXR", color_space="Raw (Keep Current)", alpha=None,
                  precision="32-bit float", compression="zip", source_path="", source_frame=1, changed=None,
